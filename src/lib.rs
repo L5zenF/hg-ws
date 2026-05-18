@@ -1,10 +1,13 @@
-pub mod app;
-pub mod config;
-pub mod dependencies;
-pub mod dns;
-pub mod external;
-pub mod monitor;
-pub mod policy;
-pub mod protocol;
-pub mod runtime;
-pub mod subscription;
+pub mod application;
+pub mod bootstrap;
+pub mod domain;
+pub mod facade;
+pub mod infrastructure;
+
+pub use application::config;
+pub use application::ports as dependencies;
+pub use domain::policy;
+pub use domain::protocol;
+pub use domain::subscription;
+pub use facade as app;
+pub use infrastructure::runtime;

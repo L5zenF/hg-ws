@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use rws::{app, config::Config, runtime::production_deps};
+use rws::{app, bootstrap::production_deps, config::Config};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

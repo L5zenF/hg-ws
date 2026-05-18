@@ -1,5 +1,6 @@
-use crate::config::Config;
 use base64::Engine;
+
+use crate::application::config::Config;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IpInfo {

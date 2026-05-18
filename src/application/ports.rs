@@ -3,11 +3,9 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use tokio::net::TcpStream;
 
 use crate::{
-    config::Config,
-    policy::DomainPolicy,
-    protocol::Destination,
-    runtime::{RuntimeError, RuntimeResult},
-    subscription::IpInfo,
+    application::config::Config,
+    domain::{policy::DomainPolicy, protocol::Destination, subscription::IpInfo},
+    infrastructure::runtime::{RuntimeError, RuntimeResult},
 };
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

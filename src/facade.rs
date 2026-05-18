@@ -13,11 +13,12 @@ use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
-    config::Config,
-    dependencies::AppDeps,
-    protocol::{parse_first_packet, ProtocolError},
-    runtime::{IoSnafu, RuntimeError},
-    subscription::generate_subscription,
+    application::{config::Config, ports::AppDeps},
+    domain::{
+        protocol::{parse_first_packet, Destination, ProtocolError},
+        subscription::generate_subscription,
+    },
+    infrastructure::runtime::{IoSnafu, RuntimeError},
 };
 
 const INDEX_HTML: &str = include_str!("../index.html");
@@ -103,7 +104,7 @@ pub async fn proxy_websocket(mut socket: WebSocket, state: AppState) -> Result<(
         .resolve(&request.destination.host)
         .await
         .context(RuntimeSnafu)?;
-    let destination = crate::protocol::Destination {
+    let destination = Destination {
         host: resolved_host,
         port: request.destination.port,
     };

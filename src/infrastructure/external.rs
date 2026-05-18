@@ -4,9 +4,9 @@ use serde_json::json;
 use snafu::ResultExt;
 
 use crate::{
-    dependencies::{BoxFuture, IspProvider, KeepAliveClient, PublicIpProvider},
-    runtime::{DecodeSnafu, HttpSnafu, RuntimeResult},
-    subscription::IpInfo,
+    application::ports::{BoxFuture, IspProvider, KeepAliveClient, PublicIpProvider},
+    domain::subscription::IpInfo,
+    infrastructure::runtime::{DecodeSnafu, HttpSnafu, RuntimeResult},
 };
 
 #[derive(Debug, Clone)]

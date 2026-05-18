@@ -5,9 +5,11 @@ use snafu::{ensure, ResultExt};
 use tokio::{process::Command, time::sleep};
 
 use crate::{
-    config::Config,
-    dependencies::{BoxFuture, MonitorAgent},
-    runtime::{AgentDownloadStatusSnafu, HttpSnafu, ProcessSnafu, RuntimeResult},
+    application::{
+        config::Config,
+        ports::{BoxFuture, MonitorAgent},
+    },
+    infrastructure::runtime::{AgentDownloadStatusSnafu, HttpSnafu, ProcessSnafu, RuntimeResult},
 };
 
 #[derive(Debug, Clone)]

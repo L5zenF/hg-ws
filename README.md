@@ -89,20 +89,26 @@ export NEZHA_KEY=your_secret_key
 
 ## 架构说明
 
-核心模块：
+核心模块按层放在文件夹里：
 
 ```text
 src/
-├── app.rs            # Axum routes、订阅接口、WebSocket 升级和转发
-├── config.rs         # 环境变量配置解析
-├── dependencies.rs   # Arc<dyn Trait> 依赖组合接口
-├── dns.rs            # DoH + 系统 DNS 解析
-├── external.rs       # 公网 IP、ISP、保活 HTTP 客户端
-├── monitor.rs        # 哪吒 agent 下载、启动、清理
-├── policy.rs         # 域名屏蔽策略
-├── protocol.rs       # VLESS/Trojan/Shadowsocks 首包解析
-├── runtime.rs        # 运行时错误、生产依赖装配、TCP 拨号
-└── subscription.rs   # 订阅链接生成
+├── application/
+│   ├── config.rs       # 环境变量配置解析
+│   └── ports.rs        # Arc<dyn Trait> 依赖组合接口
+├── domain/
+│   ├── policy.rs       # 域名屏蔽策略
+│   ├── protocol.rs     # VLESS/Trojan/Shadowsocks 首包解析
+│   └── subscription.rs # 订阅链接生成
+├── infrastructure/
+│   ├── dns.rs          # DoH + 系统 DNS 解析
+│   ├── external.rs     # 公网 IP、ISP、保活 HTTP 客户端
+│   ├── monitor.rs      # 哪吒 agent 下载、启动、清理
+│   └── runtime.rs      # 运行时错误、Tokio TCP 拨号
+├── bootstrap.rs        # 生产依赖装配
+├── facade.rs           # Axum routes、订阅接口、WebSocket 升级和转发
+├── lib.rs              # 公共 API 和兼容 re-export
+└── bin/rws.rs          # 薄启动入口
 ```
 
 运行期依赖通过 `AppDeps` 注入：

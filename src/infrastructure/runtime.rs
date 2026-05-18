@@ -1,16 +1,11 @@
-use std::{net::IpAddr, sync::Arc, time::Duration};
+use std::{net::IpAddr, time::Duration};
 
-use reqwest::Client;
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time::timeout};
 
 use crate::{
-    dependencies::{AppDeps, OutboundConnector},
-    dns::DohResolver,
-    external::HttpExternalServices,
-    monitor::NezhaMonitor,
-    policy::BlockedDomainPolicy,
-    protocol::Destination,
+    application::ports::{BoxFuture, OutboundConnector},
+    domain::protocol::Destination,
 };
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -67,7 +62,7 @@ impl OutboundConnector for TokioConnector {
     fn connect<'a>(
         &'a self,
         destination: &'a Destination,
-    ) -> crate::dependencies::BoxFuture<'a, RuntimeResult<TcpStream>> {
+    ) -> BoxFuture<'a, RuntimeResult<TcpStream>> {
         Box::pin(async move {
             let addr = format!("{}:{}", destination.host, destination.port);
             timeout(self.timeout, TcpStream::connect(&addr))
@@ -75,27 +70,6 @@ impl OutboundConnector for TokioConnector {
                 .map_err(|_| RuntimeError::TcpTimeout { addr: addr.clone() })?
                 .context(TcpConnectSnafu { addr })
         })
-    }
-}
-
-pub fn production_deps() -> AppDeps {
-    let http = Client::builder()
-        .timeout(Duration::from_secs(8))
-        .pool_idle_timeout(Duration::from_secs(60))
-        .user_agent("rws/0.1")
-        .build()
-        .expect("reqwest client config is static and valid");
-
-    let resolver = Arc::new(DohResolver::new(http.clone(), Duration::from_secs(5)));
-    let external = Arc::new(HttpExternalServices::new(http.clone()));
-    AppDeps {
-        resolver,
-        policy: Arc::new(BlockedDomainPolicy::default()),
-        connector: Arc::new(TokioConnector::new(Duration::from_secs(10))),
-        public_ip: external.clone(),
-        isp: external.clone(),
-        keep_alive: external,
-        monitor: Arc::new(NezhaMonitor::new(http)),
     }
 }
 

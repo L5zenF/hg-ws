@@ -6,8 +6,10 @@ use snafu::ResultExt;
 use tokio::net::lookup_host;
 
 use crate::{
-    dependencies::{BoxFuture, Resolver},
-    runtime::{is_ip_address, DecodeSnafu, DnsSnafu, HttpSnafu, RuntimeError, RuntimeResult},
+    application::ports::{BoxFuture, Resolver},
+    infrastructure::runtime::{
+        is_ip_address, DecodeSnafu, DnsSnafu, HttpSnafu, RuntimeError, RuntimeResult,
+    },
 };
 
 #[derive(Debug, Clone)]
