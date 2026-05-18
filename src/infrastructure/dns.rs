@@ -1,9 +1,13 @@
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use reqwest::Client;
 use serde::Deserialize;
 use snafu::ResultExt;
-use tokio::net::lookup_host;
+use tokio::{net::lookup_host, sync::RwLock};
 
 use crate::{
     application::ports::{BoxFuture, Resolver},
@@ -82,6 +86,82 @@ impl DohResolver {
                 source: std::io::Error::new(std::io::ErrorKind::NotFound, "no IPv4 address"),
             })
     }
+}
+
+#[derive(Clone)]
+pub struct CachedResolver {
+    inner: Arc<dyn Resolver>,
+    ttl: Duration,
+    max_entries: usize,
+    cache: Arc<RwLock<HashMap<String, CacheEntry>>>,
+}
+
+impl CachedResolver {
+    pub fn new(inner: Arc<dyn Resolver>, ttl: Duration, max_entries: usize) -> Self {
+        Self {
+            inner,
+            ttl,
+            max_entries,
+            cache: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+impl Resolver for CachedResolver {
+    fn resolve<'a>(&'a self, host: &'a str) -> BoxFuture<'a, RuntimeResult<String>> {
+        Box::pin(async move {
+            let now = Instant::now();
+            if let Some(ip) = self.cached(host, now).await {
+                return Ok(ip);
+            }
+
+            let ip = self.inner.resolve(host).await?;
+            self.insert(host, ip.clone(), now).await;
+            Ok(ip)
+        })
+    }
+}
+
+impl CachedResolver {
+    async fn cached(&self, host: &str, now: Instant) -> Option<String> {
+        self.cache
+            .read()
+            .await
+            .get(host)
+            .filter(|entry| entry.expires_at > now)
+            .map(|entry| entry.ip.clone())
+    }
+
+    async fn insert(&self, host: &str, ip: String, now: Instant) {
+        if self.ttl.is_zero() || self.max_entries == 0 {
+            return;
+        }
+
+        let mut cache = self.cache.write().await;
+        if cache.len() >= self.max_entries && !cache.contains_key(host) {
+            if let Some(evict_key) = cache
+                .iter()
+                .min_by_key(|(_, entry)| entry.expires_at)
+                .map(|(host, _)| host.clone())
+            {
+                cache.remove(&evict_key);
+            }
+        }
+
+        cache.insert(
+            host.to_string(),
+            CacheEntry {
+                ip,
+                expires_at: now + self.ttl,
+            },
+        );
+    }
+}
+
+#[derive(Clone)]
+struct CacheEntry {
+    ip: String,
+    expires_at: Instant,
 }
 
 #[derive(Debug, Deserialize)]

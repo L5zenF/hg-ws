@@ -6,7 +6,9 @@ use crate::{
     application::ports::AppDeps,
     domain::policy::BlockedDomainPolicy,
     infrastructure::{
-        dns::DohResolver, external::HttpExternalServices, monitor::NezhaMonitor,
+        dns::{CachedResolver, DohResolver},
+        external::HttpExternalServices,
+        monitor::NezhaMonitor,
         runtime::TokioConnector,
     },
 };
@@ -19,7 +21,11 @@ pub fn production_deps() -> AppDeps {
         .build()
         .expect("reqwest client config is static and valid");
 
-    let resolver = Arc::new(DohResolver::new(http.clone(), Duration::from_secs(5)));
+    let resolver = Arc::new(CachedResolver::new(
+        Arc::new(DohResolver::new(http.clone(), Duration::from_secs(5))),
+        Duration::from_secs(300),
+        4096,
+    ));
     let external = Arc::new(HttpExternalServices::new(http.clone()));
     AppDeps {
         resolver,

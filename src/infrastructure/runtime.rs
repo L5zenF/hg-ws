@@ -65,10 +65,14 @@ impl OutboundConnector for TokioConnector {
     ) -> BoxFuture<'a, RuntimeResult<TcpStream>> {
         Box::pin(async move {
             let addr = format!("{}:{}", destination.host, destination.port);
-            timeout(self.timeout, TcpStream::connect(&addr))
+            let stream = timeout(self.timeout, TcpStream::connect(&addr))
                 .await
                 .map_err(|_| RuntimeError::TcpTimeout { addr: addr.clone() })?
-                .context(TcpConnectSnafu { addr })
+                .context(TcpConnectSnafu { addr })?;
+            if let Err(error) = stream.set_nodelay(true) {
+                tracing::debug!(%error, "failed to enable TCP_NODELAY on outbound connection");
+            }
+            Ok(stream)
         })
     }
 }
