@@ -1,110 +1,83 @@
-# Gows - VLESS/Trojan/Shadowsocks proxy
+# Rws - VLESS/Trojan/Shadowsocks proxy
 
-这是一个用 Go 实现的 serverless 代理服务器，支持 VLESS-WS、Trojan-WS 和 Shadowsocks-WS 协议。
+这是参考 `golang` 分支实现的 Rust 版本，支持 VLESS-WS、Trojan-WS 和 Shadowsocks-WS 协议。实现重点是可测试的协议解析、`snafu` 统一错误处理、`Arc<dyn Trait + Send + Sync>` 组合运行期依赖，以及适合生产部署的异步 I/O 边界。
 
 ## 功能特性
 
-- ✅ **VLESS-WS** 协议支持
-- ✅ **Trojan-WS** 协议支持  
-- ✅ **Shadowsocks-WS** 协议支持（使用 v2ray-plugin）
-- ✅ 自定义 DNS 解析（Google DNS-over-HTTPS）
-- ✅ 测速网站域名屏蔽
-- ✅ 订阅链接生成
-- ✅ ISP 信息检测
-- ✅ 哪吒监控集成（支持 v0 和 v1）
-- ✅ 自动访问保活（可选）
+- VLESS-WS 协议支持
+- Trojan-WS 协议支持
+- Shadowsocks-WS 协议支持（配合 v2ray-plugin）
+- Google DNS-over-HTTPS，失败后回退系统 DNS
+- 测速网站域名屏蔽
+- 订阅链接生成
+- ISP 信息检测
+- 哪吒监控集成（v0/v1）
+- 自动访问保活（可选）
+- Axum + Tokio 异步 WebSocket/TCP 转发
+- `snafu` 错误分层，协议、运行时、配置错误边界清晰
 
 ## 配置说明
 
-在 `.env` 文件中配置以下环境变量：
+通过环境变量配置：
 
 | 变量名 | 说明 | 默认值 |
-|--------|------|--------|
+| --- | --- | --- |
 | `UUID` | 用户 ID（用于认证） | `5efabea4-f6d4-91fd-b8f0-17e004c89c60` |
 | `DOMAIN` | 域名（留空则自动获取公网 IP） | 空 |
 | `PORT` | 服务端口 | `3000` |
 | `WSPATH` | WebSocket 路径 | UUID 前 8 位 |
 | `SUB_PATH` | 订阅路径 | `sub` |
-| `NAME` | 节点名称 | 空 |
+| `NAME` | 节点名称前缀 | 空 |
 | `AUTO_ACCESS` | 自动访问保活 | `false` |
 | `NEZHA_SERVER` | 哪吒监控服务器 | 空 |
-| `NEZHA_PORT` | 哪吒监控端口 | 空 |
-| `NEZHA_KEY` | 哪吒监控密钥 | 空 |
+| `NEZHA_PORT` | 哪吒 v0 agent 端口；v1 不设置 | 空 |
+| `NEZHA_KEY` | 哪吒密钥 | 空 |
 
-## 安装方法
+## 构建运行
 
-### 1：源代码构建运行
-
-- Go 1.24 或更高版本
-
-### 安装步骤
-
-1. 克隆或下载项目
-
-2. 安装依赖：
-```bash
-go mod tidy
-```
-
-3. 配置环境变量：
-```bash
-cp .env.example .env
-# 编辑 .env 文件，设置你的 UUID 和其他配置
-```
-
-4. 编译运行：
-```bash
-go build -o gows
-./gows
-```
-或源代码运行
-
-### 启动服务
+本地运行：
 
 ```bash
-go run main.go
+cargo run --release
 ```
 
-### 2：下载二进制运行
+运行测试：
 
-* [点击跳转到二进制下载界面](https://github.com/eooce/node-ws/releases/tag/gows-latest)
+```bash
+cargo test
+```
 
-* 下载二进制运行
+Docker 构建：
 
-### 获取订阅链接
-服务将在配置的端口（默认 3000）上启动。
+```bash
+docker build -t rws .
+docker run --rm -p 3000:3000 -e UUID=5efabea4-f6d4-91fd-b8f0-17e004c89c60 rws
+```
 
-访问 `http://your-domain:port/sub` 获取 Base64 编码的订阅链接。
+## 获取订阅
 
-订阅包含三个协议的配置：
+服务启动后访问：
+
+```text
+http://your-domain:3000/sub
+```
+
+订阅内容是 Base64 编码，包含：
+
 - VLESS-WS
 - Trojan-WS
-- Shadowsocks-WS (with v2ray-plugin)
+- Shadowsocks-WS
 
-### 客户端配置
+## 哪吒监控
 
-#### V2rayN / V2rayNG
-
-1. 导入订阅链接：`http://your-domain:port/sub`
-2. 更新订阅
-3. 选择节点连接
-
-## 哪吒监控配置
-
-本项目支持哪吒监控（Nezha）v0 和 v1 版本。
-
-### 哪吒（v1版本）
-
-v1 版本使用配置文件，不需要设置 `NEZHA_PORT`：
+v1：
 
 ```bash
 export NEZHA_SERVER=nz.example.com:8008
 export NEZHA_KEY=your_client_secret
 ```
 
-### 哪吒（ v0版本）
-
-v0 版本使用命令行参数：
+v0：
 
 ```bash
 export NEZHA_SERVER=nz.example.com
@@ -112,58 +85,42 @@ export NEZHA_PORT=5555
 export NEZHA_KEY=your_secret_key
 ```
 
-**TLS 端口**: 如果 `NEZHA_PORT` 是以下端口之一，会自动启用 TLS：
-- 443, 8443, 2096, 2087, 2083, 2053
+`NEZHA_PORT` 为 `443`、`8443`、`2096`、`2087`、`2083`、`2053` 时会自动启用 TLS。
 
-### 架构支持
+## 架构说明
 
-程序会自动检测系统架构并下载对应的 agent：
-- **AMD64**: 适用于 x86_64 系统
-- **ARM64**: 适用于 ARM64/aarch64 系统
+核心模块：
 
-### 禁用哪吒监控
-
-如果不需要哪吒监控，只需不设置 `NEZHA_SERVER` 和 `NEZHA_KEY` 环境变量即可。
-
-## 域名屏蔽
-
-以下测速网站域名会被自动屏蔽：
-- speedtest.net
-- fast.com
-- speedtest.cn
-- speed.cloudflare.com
-- speedof.me
-- testmy.net
-- bandwidth.place
-- speed.io
-- librespeed.org
-- speedcheck.org
-
-## 项目结构
-
+```text
+src/
+├── app.rs            # Axum routes、订阅接口、WebSocket 升级和转发
+├── config.rs         # 环境变量配置解析
+├── dependencies.rs   # Arc<dyn Trait> 依赖组合接口
+├── dns.rs            # DoH + 系统 DNS 解析
+├── external.rs       # 公网 IP、ISP、保活 HTTP 客户端
+├── monitor.rs        # 哪吒 agent 下载、启动、清理
+├── policy.rs         # 域名屏蔽策略
+├── protocol.rs       # VLESS/Trojan/Shadowsocks 首包解析
+├── runtime.rs        # 运行时错误、生产依赖装配、TCP 拨号
+└── subscription.rs   # 订阅链接生成
 ```
-go-proxy/
-├── main.go              # 主程序入口
-├── handlers/            # 协议处理器
-│   ├── ws.go            # WebSocket 处理
-│   ├── vls.go           # VLESS 协议
-│   ├── tro.go           # Trojan 协议
-│   └── ss.go            # Shadowsocks 协议
-├── utils/               # 工具函数
-│   ├── dns.go           # DNS 解析
-│   ├── blocking.go      # 域名屏蔽
-│   ├── isp.go           # ISP 检测
-│   ├── ip.go            # IP 检测
-│   ├── subscription.go  # 订阅生成
-│   └── keepalive.go     # 保活功能
-├── monitor/             # 监控（可选）
-├── go.mod               # Go 模块定义
-├── index.html           # 前端静态伪装页
-└── .env.example         # 环境变量示例
 
+运行期依赖通过 `AppDeps` 注入：
+
+```rust
+pub struct AppDeps {
+    pub resolver: Arc<dyn Resolver>,
+    pub policy: Arc<dyn DomainPolicy>,
+    pub connector: Arc<dyn OutboundConnector>,
+    pub public_ip: Arc<dyn PublicIpProvider>,
+    pub isp: Arc<dyn IspProvider>,
+    pub keep_alive: Arc<dyn KeepAliveClient>,
+    pub monitor: Arc<dyn MonitorAgent>,
+}
 ```
+
+这种结构让协议解析、域名策略、DNS、外部 HTTP 和 TCP 拨号都可以独立测试或替换，便于企业场景接入自定义审计、DNS、限流、配置中心或观测系统。
 
 ## 许可证
-
 
 GPL 3.0 License

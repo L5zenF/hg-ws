@@ -1,19 +1,21 @@
-# 使用 golang:1.24 作为构建镜像
-FROM golang:1.24 AS builder
+FROM rust:1.88-bookworm AS builder
+
 WORKDIR /app
-COPY . .
-RUN go mod download && \
-    go mod tidy
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY tests ./tests
+COPY index.html ./index.html
+RUN cargo build --release
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-extldflags -static" -o app main.go
+FROM debian:bookworm-slim
 
-# 第二阶段：使用alpine作为基础镜像
-FROM alpine:3.22
-RUN apk --no-cache add ca-certificates tzdata
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /tmp
-COPY --from=builder /app/app .
-COPY --from=builder /app/index.html .
+COPY --from=builder /app/target/release/rws ./app
 RUN chmod +x /tmp/app
-EXPOSE 3000
 
+EXPOSE 3000
 CMD ["./app"]
